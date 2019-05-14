@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use futures::future::{Future, TryFutureExt};
 use futures_legacy::Future as LegacyFuture;
 
@@ -6,12 +8,12 @@ use crate::domain::channel::{Channel, ChannelRepository};
 use crate::infrastructure::persistence::DbPool;
 
 pub struct MemoryChannelRepository {
-    records: Vec<Channel>,
+    records: Arc<Mutex<Vec<Channel>>>,
 }
 
 impl MemoryChannelRepository {
-    pub fn new() -> Self {
-        Self { records: vec![Channel { id: "memory".to_owned() }] }
+    pub fn new(initial_channels: Option<&[Channel]>) -> Self {
+        Self { records: Arc::new(Mutex::new(initial_channels.unwrap_or(&[]).to_vec())) }
     }
 }
 
@@ -19,12 +21,14 @@ impl ChannelRepository for MemoryChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
         Box::pin(
             futures::future::ok(
-                self.records.iter().map(|channel| channel.clone()).collect()
+                self.records.lock().unwrap().iter().map(|channel| channel.clone()).collect()
             )
         )
     }
 
     fn insert(&self, channel: Channel) -> RepositoryFuture<()> {
+        &self.records.lock().unwrap().push(channel);
+
         Box::pin(
             futures::future::ok(
                 ()

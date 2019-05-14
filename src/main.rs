@@ -10,7 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
 use sentry::application::handler::Handler;
-use sentry::domain::channel::{Channel, ChannelRepository};
+use sentry::domain::channel::Channel;
 use sentry::domain::RepositoryError;
 use sentry::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
 use sentry::infrastructure::persistence::DbPool;
@@ -26,8 +26,9 @@ fn handle(pool: DbPool, mut stream: TcpStream) {
 }
 
 async fn handle_request(pool: DbPool) -> Result<Vec<Channel>, RepositoryError> {
-//    let channel_repository = MemoryChannelRepository::new();
-    let channel_repository = PostgresChannelRepository::new(pool.clone());
+    let initial_memory_channels = vec![Channel { id: "memory".to_owned() }];
+    let channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
+//    let channel_repository = PostgresChannelRepository::new(pool.clone());
     let handler = Handler::new(&channel_repository);
 
     await!(handler.list())
