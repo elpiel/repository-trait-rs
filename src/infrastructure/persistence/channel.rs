@@ -16,17 +16,17 @@ impl MemoryChannelRepository {
 
 impl ChannelRepository for MemoryChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
-        Box::new(
+        Box::pin(
             futures::future::ok(
                 self.records.iter().map(|channel| channel.clone()).collect()
-            ).compat()
+            )
         )
     }
     fn insert(&self, channel: Channel) -> RepositoryFuture<()> {
-        Box::new(
+        Box::pin(
             futures::future::ok(
                 ()
-            ).compat()
+            )
         )
     }
 }

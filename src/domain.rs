@@ -1,10 +1,12 @@
-use futures_legacy::Future;
+use futures_legacy::Future as LegacyFuture;
+use futures::Future;
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub enum RepositoryError {
     AlreadyExist,
 }
 
-pub type RepositoryFuture<T> = Box<Future<Item = T, Error=RepositoryError>  + Send>;
+pub type RepositoryFuture<T> = Pin<Box<Future<Output=Result<T, RepositoryError>> + Send>>;
 
 pub mod channel;
