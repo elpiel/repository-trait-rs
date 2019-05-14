@@ -4,6 +4,17 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <elpiel93@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "sentry"
+path = "src/lib.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Futures
+futures-preview = { version = "=0.3.0-alpha.14", features = ["compat", "io-compat"] }
+futures_legacy = { version = "0.1", package = "futures" }
+# Concurrency
+tokio = { version = "=0.1.19", features = ["async-await-preview"] }
+# Utils
+try_future = "0.1.3"
