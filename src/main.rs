@@ -1,13 +1,15 @@
 #![feature(await_macro, async_await)]
 
+use std::net::SocketAddr;
+
 use tokio::await;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use sentry::domain::{RepositoryError};
+
+use sentry::application::handler::Handler;
+use sentry::domain::RepositoryError;
 use sentry::domain::channel::{Channel, ChannelRepository};
 use sentry::infrastructure::persistence::channel::MemoryChannelRepository;
-
-use std::net::SocketAddr;
 
 fn handle(mut stream: TcpStream) {
     tokio::spawn_async(async move {
@@ -18,9 +20,10 @@ fn handle(mut stream: TcpStream) {
 }
 
 async fn handle_request() -> Result<Vec<Channel>, RepositoryError> {
-    let repo = MemoryChannelRepository::new();
+    let channel_repository = MemoryChannelRepository::new();
+    let handler = Handler::new(&channel_repository);
 
-    await!(repo.list())
+    await!(handler.list())
 }
 
 fn main() {
