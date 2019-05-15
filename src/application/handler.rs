@@ -12,7 +12,7 @@ impl<'a> Handler<'a> {
 
     pub async fn insert(&self, channels: &'a [Channel]) -> Result<(), RepositoryError> {
         for channel in channels.to_owned() {
-            await!(self.channel_repository.insert(channel));
+            let _ = await!(self.channel_repository.insert(channel));
         }
 
         Ok(())

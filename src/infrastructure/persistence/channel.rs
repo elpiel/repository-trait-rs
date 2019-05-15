@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use futures::compat::Future01CompatExt;
-use futures::future::{Future, TryFutureExt};
+use futures::future::{Future, FutureExt, TryFutureExt};
 use futures_legacy::Future as LegacyFuture;
 use futures_legacy::future::IntoFuture as LegacyIntoFuture;
 use futures_legacy::stream::Stream as LegacyStream;
@@ -43,7 +43,6 @@ impl ChannelRepository for MemoryChannelRepository {
     }
 }
 
-
 pub struct PostgresChannelRepository {
     pool: DbPool,
 }
@@ -75,7 +74,6 @@ impl ChannelRepository for PostgresChannelRepository {
                         Err(err) => try_future!(Err((err, client))),
                     })
                     .and_then(|(rows, client)| {
-                        // @TODO: Add the ChannelSpecs hydration
                         let channels = rows
                             .iter()
                             .map(|row| {
@@ -89,31 +87,13 @@ impl ChannelRepository for PostgresChannelRepository {
                     })
             })
             .map_err(|err| RepositoryError::AlreadyExist)
-            ;
+            .compat()
+            .boxed();
 
-        Box::pin(
-            results.compat()
-        )
-//        let stmt = conn.prepare("SELECT channel_id FROM channels").unwrap();
-//
-//        let results = conn
-//            .query(&stmt, &[])
-//            .unwrap()
-//            .iter()
-//            .map(|row| {
-//                Channel {
-//                    id: row.get("channel_id")
-//                }
-//            })
-//            .collect();
-//        Box::pin(
-//            futures::future::ok(
-//                results
-//            )
-//        )
+        results
     }
 
-    fn insert(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn insert(&self, _channel: Channel) -> RepositoryFuture<()> {
         Box::pin(
             futures::future::ok(
                 ()

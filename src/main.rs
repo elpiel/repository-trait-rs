@@ -11,10 +11,10 @@ use sentry::domain::channel::Channel;
 use sentry::domain::RepositoryError;
 use sentry::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
 use sentry::infrastructure::persistence::DbPool;
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::FutureExt;
 use futures::compat::Future01CompatExt;
 
-fn handle(pool: DbPool, mut stream: TcpStream) {
+fn handle(pool: DbPool, mut _stream: TcpStream) {
     let pool = pool.clone();
 
     tokio::spawn_async(async move {
@@ -28,10 +28,10 @@ async fn handle_request(pool: DbPool) -> Result<String, RepositoryError> {
     let postgres_channel_repository = PostgresChannelRepository::new(pool.clone());
     let initial_memory_channels = [Channel { id: "memory".to_owned() }];
     println!("Initial memory channels: {:?}", &initial_memory_channels);
-    let memory_channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
+    let _memory_channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
 
-    let handler = Handler::new(&memory_channel_repository);
-//    let handler = Handler::new(&postgres_channel_repository);
+//    let handler = Handler::new(&memory_channel_repository);
+    let handler = Handler::new(&postgres_channel_repository);
 
     let channels = vec![
         Channel { id: "channel 1".to_owned() },
