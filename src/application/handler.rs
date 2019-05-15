@@ -10,16 +10,15 @@ impl<'a> Handler<'a> {
         Self { channel_repository }
     }
 
-    pub async fn list(&self) -> Result<Vec<Channel>, RepositoryError> {
-        let channels = vec![
-            Channel { id: "channel 1".to_owned() },
-            Channel { id: "channel 2".to_owned() },
-        ];
-
-        for channel in channels {
+    pub async fn insert(&self, channels: &'a [Channel]) -> Result<(), RepositoryError> {
+        for channel in channels.to_owned() {
             await!(self.channel_repository.insert(channel));
         }
 
+        Ok(())
+    }
+
+    pub async fn list(&self) -> Result<Vec<Channel>, RepositoryError> {
         await!(self.channel_repository.list())
     }
 }
