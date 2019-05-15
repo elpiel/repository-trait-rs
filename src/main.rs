@@ -11,24 +11,39 @@ use sentry::domain::channel::Channel;
 use sentry::domain::RepositoryError;
 use sentry::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
 use sentry::infrastructure::persistence::DbPool;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::compat::Future01CompatExt;
 
 fn handle(pool: DbPool, mut stream: TcpStream) {
     let pool = pool.clone();
 
     tokio::spawn_async(async move {
-        let channels = await!(handle_request(pool)).unwrap();
+        let response = await!(handle_request(pool)).unwrap();
 
-        println!("{:?}", channels);
+        println!("{}", response);
     });
 }
 
-async fn handle_request(pool: DbPool) -> Result<Vec<Channel>, RepositoryError> {
-    let initial_memory_channels = vec![Channel { id: "memory".to_owned() }];
-    let channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
-//    let channel_repository = PostgresChannelRepository::new(pool.clone());
-    let handler = Handler::new(&channel_repository);
+async fn handle_request(pool: DbPool) -> Result<String, RepositoryError> {
+    let postgres_channel_repository = PostgresChannelRepository::new(pool.clone());
+    let initial_memory_channels = [Channel { id: "memory".to_owned() }];
+    println!("Initial memory channels: {:?}", &initial_memory_channels);
+    let memory_channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
 
-    await!(handler.list())
+    let handler = Handler::new(&memory_channel_repository);
+//    let handler = Handler::new(&postgres_channel_repository);
+
+    let channels = vec![
+        Channel { id: "channel 1".to_owned() },
+        Channel { id: "channel 2".to_owned() },
+    ];
+
+    println!("Insert some channels: {:?}", &channels);
+    await!(handler.insert(&channels)).unwrap();
+
+    let channels_list = await!(handler.list()).unwrap();
+
+    Ok(format!("{:?}", channels_list))
 }
 
 fn main() {
@@ -41,19 +56,26 @@ fn main() {
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-    let manager = r2d2_postgres::PostgresConnectionManager::new(
-        "postgresql://postgres:docker@localhost:5432/sentry".parse().unwrap(),
-        postgres::NoTls,
+    tokio::run_async(
+        bootstrap(listener) .map(|_| ())
+    );
+}
+
+async fn bootstrap(listener: TcpListener) {
+    let mut incoming = listener.incoming();
+    let db_pool = await!(database_pool()).expect("Database connection failed");
+
+    while let Some(stream) = await!(incoming.next()) {
+        let stream = stream.unwrap();
+        handle(db_pool.clone(), stream);
+    }
+}
+
+async fn database_pool() -> Result<DbPool, tokio_postgres::Error> {
+    let postgres_connection = bb8_postgres::PostgresConnectionManager::new(
+        "postgresql://postgres:docker@localhost:5432/sentry",
+        tokio_postgres::NoTls,
     );
 
-    let pool = r2d2::Pool::new(manager).unwrap();
-
-    tokio::run_async(async move {
-        let mut incoming = listener.incoming();
-
-        while let Some(stream) = await!(incoming.next()) {
-            let stream = stream.unwrap();
-            handle(pool.clone(), stream);
-        }
-    });
+    await!(bb8::Pool::builder().build(postgres_connection).compat())
 }
