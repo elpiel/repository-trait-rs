@@ -1,26 +1,34 @@
 #![feature(await_macro, async_await)]
 
+use std::net::SocketAddr;
+
 use tokio::await;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use sentry::domain::{RepositoryError};
-use sentry::domain::channel::{Channel, ChannelRepository};
-use sentry::infrastructure::persistence::channel::MemoryChannelRepository;
 
-use std::net::SocketAddr;
+use sentry::application::handler::Handler;
+use sentry::domain::channel::Channel;
+use sentry::domain::RepositoryError;
+use sentry::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
+use sentry::infrastructure::persistence::DbPool;
 
-fn handle(mut stream: TcpStream) {
+fn handle(pool: DbPool, mut stream: TcpStream) {
+    let pool = pool.clone();
+
     tokio::spawn_async(async move {
-        let channels = await!(handle_request()).unwrap();
+        let channels = await!(handle_request(pool)).unwrap();
 
         println!("{:?}", channels);
     });
 }
 
-async fn handle_request() -> Result<Vec<Channel>, RepositoryError> {
-    let repo = MemoryChannelRepository::new();
+async fn handle_request(pool: DbPool) -> Result<Vec<Channel>, RepositoryError> {
+    let initial_memory_channels = vec![Channel { id: "memory".to_owned() }];
+    let channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
+//    let channel_repository = PostgresChannelRepository::new(pool.clone());
+    let handler = Handler::new(&channel_repository);
 
-    await!(repo.list())
+    await!(handler.list())
 }
 
 fn main() {
@@ -33,12 +41,19 @@ fn main() {
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-    tokio::run_async(async {
+    let manager = r2d2_postgres::PostgresConnectionManager::new(
+        "postgresql://postgres:docker@localhost:5432/sentry".parse().unwrap(),
+        postgres::NoTls,
+    );
+
+    let pool = r2d2::Pool::new(manager).unwrap();
+
+    tokio::run_async(async move {
         let mut incoming = listener.incoming();
 
         while let Some(stream) = await!(incoming.next()) {
             let stream = stream.unwrap();
-            handle(stream);
+            handle(pool.clone(), stream);
         }
     });
 }
