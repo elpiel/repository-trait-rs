@@ -2,9 +2,6 @@
 
 use std::net::SocketAddr;
 
-use postgres::{Client, NoTls};
-use r2d2::Pool;
-use r2d2_postgres::PostgresConnectionManager;
 use tokio::await;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -44,9 +41,9 @@ fn main() {
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-    let manager = PostgresConnectionManager::new(
+    let manager = r2d2_postgres::PostgresConnectionManager::new(
         "postgresql://postgres:docker@localhost:5432/sentry".parse().unwrap(),
-        NoTls,
+        postgres::NoTls,
     );
 
     let pool = r2d2::Pool::new(manager).unwrap();

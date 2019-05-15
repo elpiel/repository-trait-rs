@@ -1,4 +1,3 @@
-use futures_legacy::Future as LegacyFuture;
 use futures::Future;
 use std::pin::Pin;
 
