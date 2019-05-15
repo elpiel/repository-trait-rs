@@ -15,7 +15,7 @@ path = "src/lib.rs"
 futures-preview = { version = "=0.3.0-alpha.14", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
 # Concurrency
-tokio = { version = "=0.1.19", features = ["async-await-preview"] }
+tokio = { version = "=0.1.19" }
 # Utils
 try_future = "0.1.3"
 # Database

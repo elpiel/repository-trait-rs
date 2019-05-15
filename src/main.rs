@@ -1,8 +1,10 @@
 #![feature(await_macro, async_await)]
 
 use std::net::SocketAddr;
+use std::r#await;
 
-use tokio::await;
+use futures::compat::{Future01CompatExt};
+use futures::future::{FutureExt, TryFutureExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 
@@ -11,23 +13,23 @@ use sentry::domain::channel::Channel;
 use sentry::domain::RepositoryError;
 use sentry::infrastructure::persistence::channel::{MemoryChannelRepository, PostgresChannelRepository};
 use sentry::infrastructure::persistence::DbPool;
-use futures::future::FutureExt;
-use futures::compat::Future01CompatExt;
 
-fn handle(pool: DbPool, mut _stream: TcpStream) {
+fn spawn(pool: DbPool, mut _stream: TcpStream) {
     let pool = pool.clone();
 
-    tokio::spawn_async(async move {
-        let response = await!(handle_request(pool)).unwrap();
+    tokio::spawn(handle(pool).unit_error().boxed().compat());
+}
 
-        println!("{}", response);
-    });
+async fn handle(pool: DbPool) {
+    let response = await!(handle_request(pool)).unwrap();
+
+    println!("{}", response);
 }
 
 async fn handle_request(pool: DbPool) -> Result<String, RepositoryError> {
     let postgres_channel_repository = PostgresChannelRepository::new(pool.clone());
     let initial_memory_channels = [Channel { id: "memory".to_owned() }];
-    println!("Initial memory channels: {:?}", &initial_memory_channels);
+//    println!("Initial memory channels: {:?}", &initial_memory_channels);
     let _memory_channel_repository = MemoryChannelRepository::new(Some(&initial_memory_channels));
 
 //    let handler = Handler::new(&memory_channel_repository);
@@ -56,19 +58,25 @@ fn main() {
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-    tokio::run_async(
-        bootstrap(listener) .map(|_| ())
+    tokio::run(
+        bootstrap(listener).unit_error().boxed().compat()
     );
 }
 
 async fn bootstrap(listener: TcpListener) {
-    let mut incoming = listener.incoming();
+    let incoming = listener.incoming();
+
     let db_pool = await!(database_pool()).expect("Database connection failed");
 
-    while let Some(stream) = await!(incoming.next()) {
-        let stream = stream.unwrap();
-        handle(db_pool.clone(), stream);
-    }
+    let fut = incoming
+        .for_each(|stream| {
+            spawn(db_pool.clone(), stream);
+
+            Ok(())
+        })
+        .compat();
+
+    await!(fut).unwrap();
 }
 
 async fn database_pool() -> Result<DbPool, tokio_postgres::Error> {
