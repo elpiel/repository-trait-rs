@@ -1,7 +1,11 @@
 use std::sync::{Arc, RwLock};
 
-use futures::future::{Future, TryFutureExt};
+use futures::compat::Future01CompatExt;
+use futures::future::FutureExt;
 use futures_legacy::Future as LegacyFuture;
+use futures_legacy::future::IntoFuture as LegacyIntoFuture;
+use futures_legacy::stream::Stream as LegacyStream;
+use try_future::try_future;
 
 use crate::domain::{RepositoryError, RepositoryFuture};
 use crate::domain::channel::{Channel, ChannelRepository};
@@ -13,7 +17,9 @@ pub struct MemoryChannelRepository {
 
 impl MemoryChannelRepository {
     pub fn new(initial_channels: Option<&[Channel]>) -> Self {
-        Self { records: Arc::new(RwLock::new(initial_channels.unwrap_or(&[]).to_vec())) }
+        let memory_channels = initial_channels.unwrap_or(&[]).to_vec();
+
+        Self { records: Arc::new(RwLock::new(memory_channels)) }
     }
 }
 
@@ -37,7 +43,6 @@ impl ChannelRepository for MemoryChannelRepository {
     }
 }
 
-
 pub struct PostgresChannelRepository {
     pool: DbPool,
 }
@@ -50,28 +55,45 @@ impl PostgresChannelRepository {
 
 impl ChannelRepository for PostgresChannelRepository {
     fn list(&self) -> RepositoryFuture<Vec<Channel>> {
-        let mut conn = self.pool.get().unwrap();
-        let stmt = conn.prepare("SELECT channel_id FROM channels").unwrap();
+        let results = self.pool
+            .run(|mut client| {
+                client
+                    .prepare("SELECT channel_id FROM channels")
+                    .then(|res| match res {
+                        Ok(stmt) => {
+                            client
+                                .query(&stmt, &[])
+                                .collect()
+                                .into_future()
+                                .then(|res| match res {
+                                    Ok(rows) => Ok((rows, client)),
+                                    Err(err) => Err((err, client)),
+                                })
+                                .into()
+                        }
+                        Err(err) => try_future!(Err((err, client))),
+                    })
+                    .and_then(|(rows, client)| {
+                        let channels = rows
+                            .iter()
+                            .map(|row| {
+                                Channel {
+                                    id: row.get("channel_id"),
+                                }
+                            })
+                            .collect();
 
-        let results = conn
-            .query(&stmt, &[])
-            .unwrap()
-            .iter()
-            .map(|row| {
-                Channel {
-                    id: row.get("channel_id")
-                }
+                        Ok((channels, client))
+                    })
             })
-            .collect();
+            .map_err(|err| RepositoryError::AlreadyExist)
+            .compat()
+            .boxed();
 
-        Box::pin(
-            futures::future::ok(
-                results
-            )
-        )
+        results
     }
 
-    fn insert(&self, channel: Channel) -> RepositoryFuture<()> {
+    fn insert(&self, _channel: Channel) -> RepositoryFuture<()> {
         Box::pin(
             futures::future::ok(
                 ()

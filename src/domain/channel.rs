@@ -1,6 +1,4 @@
-use futures::Future;
-
-use crate::domain::{RepositoryFuture};
+use crate::domain::RepositoryFuture;
 
 #[derive(Debug, Clone)]
 pub struct Channel {
