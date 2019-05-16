@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use futures::compat::Future01CompatExt;
-use futures::future::{Future, FutureExt, TryFutureExt};
+use futures::future::FutureExt;
 use futures_legacy::Future as LegacyFuture;
 use futures_legacy::future::IntoFuture as LegacyIntoFuture;
 use futures_legacy::stream::Stream as LegacyStream;

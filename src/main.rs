@@ -1,7 +1,6 @@
 #![feature(await_macro, async_await)]
 
 use std::net::SocketAddr;
-use std::r#await;
 
 use futures::compat::{Future01CompatExt};
 use futures::future::{FutureExt, TryFutureExt};
@@ -21,7 +20,7 @@ fn spawn(pool: DbPool, mut _stream: TcpStream) {
 }
 
 async fn handle(pool: DbPool) {
-    let response = await!(handle_request(pool)).unwrap();
+    let response = handle_request(pool).await.unwrap();
 
     println!("{}", response);
 }
@@ -41,9 +40,9 @@ async fn handle_request(pool: DbPool) -> Result<String, RepositoryError> {
     ];
 
     println!("Insert some channels: {:?}", &channels);
-    await!(handler.insert(&channels)).unwrap();
+    handler.insert(&channels).await.unwrap();
 
-    let channels_list = await!(handler.list()).unwrap();
+    let channels_list = handler.list().await.unwrap();
 
     Ok(format!("{:?}", channels_list))
 }
@@ -66,7 +65,7 @@ fn main() {
 async fn bootstrap(listener: TcpListener) {
     let incoming = listener.incoming();
 
-    let db_pool = await!(database_pool()).expect("Database connection failed");
+    let db_pool = database_pool().await.expect("Database connection failed");
 
     let fut = incoming
         .for_each(|stream| {
@@ -76,7 +75,7 @@ async fn bootstrap(listener: TcpListener) {
         })
         .compat();
 
-    await!(fut).unwrap();
+    fut.await.unwrap();
 }
 
 async fn database_pool() -> Result<DbPool, tokio_postgres::Error> {
@@ -85,5 +84,5 @@ async fn database_pool() -> Result<DbPool, tokio_postgres::Error> {
         tokio_postgres::NoTls,
     );
 
-    await!(bb8::Pool::builder().build(postgres_connection).compat())
+    bb8::Pool::builder().build(postgres_connection).compat().await
 }

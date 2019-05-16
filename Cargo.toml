@@ -12,7 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Futures
-futures-preview = { version = "=0.3.0-alpha.14", features = ["compat", "io-compat"] }
+futures-preview = { version = "=0.3.0-alpha.16", features = ["compat", "io-compat"] }
 futures_legacy = { version = "0.1", package = "futures" }
 # Concurrency
 tokio = { version = "=0.1.19" }

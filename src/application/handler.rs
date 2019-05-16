@@ -12,13 +12,13 @@ impl<'a> Handler<'a> {
 
     pub async fn insert(&self, channels: &'a [Channel]) -> Result<(), RepositoryError> {
         for channel in channels.to_owned() {
-            let _ = await!(self.channel_repository.insert(channel));
+            let _ = self.channel_repository.insert(channel).await;
         }
 
         Ok(())
     }
 
     pub async fn list(&self) -> Result<Vec<Channel>, RepositoryError> {
-        await!(self.channel_repository.list())
+        self.channel_repository.list().await
     }
 }
